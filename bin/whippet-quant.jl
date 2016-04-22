@@ -49,6 +49,9 @@ function parse_cmd()
     "--no-tpm"
       help     = "Should tpm file be sent to output/prefix.tpm.gz? (default on)"
       action   = :store_true
+    "--simul"
+      help     = "Data is simulated, output mapping error rates"
+      action   = :store_true
   end
   return parse_args(s)
 end
@@ -89,7 +92,7 @@ function main()
          readlen = round(Int, readlen)
          println(STDERR, "Finished mapping $mapped paired-end reads of length $readlen each out of a total $total mate-pairs...")
       else
-         @timer mapped,total,readlen = process_reads!( parser, param, lib, quant, multi, sam=args["sam"] )
+         @timer mapped,total,readlen = process_reads!( parser, param, lib, quant, multi, sam=args["sam"], simul=args["simul"] )
          readlen = round(Int, readlen)
          println(STDERR, "Finished mapping $mapped single-end reads of length $readlen out of a total $total reads...")
       end

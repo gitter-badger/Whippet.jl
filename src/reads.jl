@@ -53,19 +53,38 @@ macro broadcast(nm, val)
    end
 end
 
+# Use this function for true positive rates in the accuracy branch.
+function ismappedcorrectly( read::SeqRecord, avec::Vector{SGAlignment}, lib::GraphLib )
+   ord    = sortperm( avec, by=score )
+   best   = avec[ ord[end] ]
+   gene   = best.path[1].gene
+   spl    = split( read.name, '/' )[end] |> x->split( x, ';' )
+   @assert( length(spl) == 3, "ERROR: Incorrect format for simulated read name!" )
+   nodes  = split( spl[1], '_' )[end] |> x->split( x, '-' )
+   @assert( length(nodes) == 3, "ERROR: Incorrect format for simulated read name!" )
+   offset = split( spl[2], ':' )[end] |> x->parse(Int, x)
+   used = 0
+   for nstr in split( nodes, '-' )
+      n = parse(Int, nstr)
+      if used <= offset < used+lib.graphs[gene].nodelen[n]
+         
+      end
+   end
+end
 
 process_reads!( parser, param::AlignParam, lib::GraphLib,
                 quant::GraphLibQuant, multi::Vector{Multimap}; 
-                bufsize=50, sam=false) = _process_reads!( parser, param, lib, quant,
-                                                          multi, bufsize=bufsize, sam=sam )
+                bufsize=50, sam=false, simul=false) = _process_reads!( parser, param, lib, quant,
+                                                      multi, bufsize=bufsize, sam=sam, simul=simul )
 
 function _process_reads!( parser, param::AlignParam, lib::GraphLib, quant::GraphLibQuant, 
-                         multi::Vector{Multimap}; bufsize=50, sam=false )
+                         multi::Vector{Multimap}; bufsize=50, sam=false, simul=false )
   
    const reads  = allocate_chunk( parser, size=bufsize )
    mean_readlen = 0.0
    total        = 0
    mapped       = 0
+   correct      = 0
    if sam
       stdbuf = BufferedOutputStream( STDOUT )
       write_sam_header( stdbuf, lib )
@@ -82,6 +101,7 @@ function _process_reads!( parser, param::AlignParam, lib::GraphLib, quant::Graph
                count!( quant, align.value[1] )
                sam && write_sam( stdbuf, reads[i], align.value[1], lib )
             end
+            simul && (correct += ismappedcorrectly( reads[i], align.value, lib ) ? 1 : 0)
             mapped += 1
             @fastmath mean_readlen += (length(reads[i].seq) - mean_readlen) / mapped
          end
@@ -90,7 +110,7 @@ function _process_reads!( parser, param::AlignParam, lib::GraphLib, quant::Graph
    if sam
       close(stdbuf)
    end
-   mapped,total,mean_readlen
+   mapped,correct,total,mean_readlen
 end
 
 # paired end version
