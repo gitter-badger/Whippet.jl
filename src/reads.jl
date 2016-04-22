@@ -63,11 +63,12 @@ function ismappedcorrectly( read::SeqRecord, avec::Vector{SGAlignment}, lib::Gra
    nodes  = split( spl[1], '_' )[end] |> x->split( x, '-' )
    @assert( length(nodes) == 3, "ERROR: Incorrect format for simulated read name!" )
    offset = split( spl[2], ':' )[end] |> x->parse(Int, x)
-   used = 0
+   used  = 0
+   # compare simulated path with best.path
    for nstr in split( nodes, '-' )
       n = parse(Int, nstr)
       if used <= offset < used+lib.graphs[gene].nodelen[n]
-         
+          
       end
    end
 end
