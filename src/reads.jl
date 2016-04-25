@@ -59,18 +59,51 @@ function ismappedcorrectly( read::SeqRecord, avec::Vector{SGAlignment}, lib::Gra
    best   = avec[ ord[end] ]
    gene   = best.path[1].gene
    spl    = split( read.name, '/' )[end] |> x->split( x, ';' )
-   @assert( length(spl) == 3, "ERROR: Incorrect format for simulated read name!" )
+   @assert( length(spl) == 3, "ERROR: Incorrect format for simulated read name, $(spl)!" )
    nodes  = split( spl[1], '_' )[end] |> x->split( x, '-' )
-   @assert( length(nodes) == 3, "ERROR: Incorrect format for simulated read name!" )
-   offset = split( spl[2], ':' )[end] |> x->parse(Int, x)
+   offset = split( spl[2], ':' )[end] |> x->split( x, '-' )
+   @assert( length(offset) == 2, "ERROR: Incorrect format for simulated read name, $(read.name)!" )
+   off = parse(Int, offset[1]), parse(Int, offset[2])
    used  = 0
    # compare simulated path with best.path
-   for nstr in split( nodes, '-' )
+   len = off[2] - off[1]
+   has_started = false
+   path = IntSet()
+   # get path from nodestr, store into IntSet
+   for nstr in nodes
       n = parse(Int, nstr)
-      if used <= offset < used+lib.graphs[gene].nodelen[n]
-          
+      if used <= off[1] < used+lib.graphs[gene].nodelen[n]
+         len -= used+lib.graphs[gene].nodelen[n] - off[1]
+         has_started = true
+         push!(path, n)
+      elseif has_started
+         if len > 0
+            push!(path, n)
+            len -= lib.graphs[gene].nodelen[n]
+         else
+            break
+         end
       end
+      used += lib.graphs[gene].nodelen[n]
    end
+
+   # now test if they are equivalent
+   partial = true
+   complete = true
+   if best.path[1].node == first(path)
+      shift!(path)
+      for i in 2:length(best.path)
+         if best.path[i].node != first(path)
+            complete = false
+            break
+         end
+         shift!(path)
+      end
+   else
+      partial = false
+      complete = false
+   end
+   partial,complete
 end
 
 process_reads!( parser, param::AlignParam, lib::GraphLib,
@@ -85,7 +118,8 @@ function _process_reads!( parser, param::AlignParam, lib::GraphLib, quant::Graph
    mean_readlen = 0.0
    total        = 0
    mapped       = 0
-   correct      = 0
+   correct_part = 0
+   correct_full = 0
    if sam
       stdbuf = BufferedOutputStream( STDOUT )
       write_sam_header( stdbuf, lib )
@@ -102,7 +136,11 @@ function _process_reads!( parser, param::AlignParam, lib::GraphLib, quant::Graph
                count!( quant, align.value[1] )
                sam && write_sam( stdbuf, reads[i], align.value[1], lib )
             end
-            simul && (correct += ismappedcorrectly( reads[i], align.value, lib ) ? 1 : 0)
+            if simul
+               part,full = ismappedcorrectly( reads[i], align.value, lib )
+               correct_part += part ? 1 : 0
+               correct_full += full ? 1 : 0
+            end
             mapped += 1
             @fastmath mean_readlen += (length(reads[i].seq) - mean_readlen) / mapped
          end
@@ -111,7 +149,7 @@ function _process_reads!( parser, param::AlignParam, lib::GraphLib, quant::Graph
    if sam
       close(stdbuf)
    end
-   mapped,correct,total,mean_readlen
+   mapped,correct_part,correct_full,total,mean_readlen
 end
 
 # paired end version

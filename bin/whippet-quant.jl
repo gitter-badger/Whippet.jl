@@ -92,9 +92,10 @@ function main()
          readlen = round(Int, readlen)
          println(STDERR, "Finished mapping $mapped paired-end reads of length $readlen each out of a total $total mate-pairs...")
       else
-         @timer mapped,total,readlen = process_reads!( parser, param, lib, quant, multi, sam=args["sam"], simul=args["simul"] )
+         @timer mapped,part,full,total,readlen = process_reads!( parser, param, lib, quant, multi, sam=args["sam"], simul=args["simul"] )
          readlen = round(Int, readlen)
          println(STDERR, "Finished mapping $mapped single-end reads of length $readlen out of a total $total reads...")
+         println(STDERR, "Mapped $part -- $( part / total ) correctly at offset, $full -- $( full / total ) correctly at full path!")
       end
    end
 
