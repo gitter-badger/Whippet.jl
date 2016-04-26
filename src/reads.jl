@@ -53,57 +53,77 @@ macro broadcast(nm, val)
    end
 end
 
-# Use this function for true positive rates in the accuracy branch.
-function ismappedcorrectly( read::SeqRecord, avec::Vector{SGAlignment}, lib::GraphLib )
-   ord    = sortperm( avec, by=score )
-   best   = avec[ ord[end] ]
-   gene   = best.path[1].gene
-   spl    = split( read.name, '/' )[end] |> x->split( x, ';' )
-   @assert( length(spl) == 3, "ERROR: Incorrect format for simulated read name, $(spl)!" )
-   nodes  = split( spl[1], '_' )[end] |> x->split( x, '-' )
-   offset = split( spl[2], ':' )[end] |> x->split( x, '-' )
-   @assert( length(offset) == 2, "ERROR: Incorrect format for simulated read name, $(read.name)!" )
-   off = parse(Int, offset[1]), parse(Int, offset[2])
-   used  = 0
-   # compare simulated path with best.path
-   len = off[2] - off[1]
-   has_started = false
+function get_path( offset, leng, nodelist, sg )
+   used = 0
    path = IntSet()
-   # get path from nodestr, store into IntSet
-   for nstr in nodes
-      n = parse(Int, nstr)
-      if used <= off[1] < used+lib.graphs[gene].nodelen[n]
-         len -= used+lib.graphs[gene].nodelen[n] - off[1]
+   len = leng
+   has_started = false
+   for n in nodelist
+      n > length(sg.nodelen) && break
+      if used <= offset < used+sg.nodelen[n]
+         len -= (used+sg.nodelen[n]) - offset
          has_started = true
          push!(path, n)
       elseif has_started
          if len > 0
             push!(path, n)
-            len -= lib.graphs[gene].nodelen[n]
+            len -= sg.nodelen[n]
          else
             break
          end
       end
-      used += lib.graphs[gene].nodelen[n]
+      used += sg.nodelen[n]
    end
+   path
+end
 
-   # now test if they are equivalent
+function cmp_paths( path::IntSet, aln::SGAlignment )
+
    partial = true
    complete = true
-   if best.path[1].node == first(path)
+   if length(path) > 0 && (aln.path[1].node == first(path))
       shift!(path)
-      for i in 2:length(best.path)
-         if best.path[i].node != first(path)
+      for i in 2:length(aln.path)
+         if length(path) == 0 || aln.path[i].node != first(path)
             complete = false
             break
          end
          shift!(path)
       end
    else
+   #   println("path: $(best.path) vs. $path, $(read.name)")
       partial = false
       complete = false
    end
    partial,complete
+end
+
+# Use this function for true positive rates in the accuracy branch.
+function ismappedcorrectly( read::SeqRecord, avec::Vector{SGAlignment}, lib::GraphLib )
+   failed = false
+   ord    = sortperm( avec, by=score )
+   best   = avec[ ord[end] ]
+   gene   = best.path[1].gene
+   spl    = split( read.name, '/' )[end] |> x->split( x, ';' )
+   @assert( length(spl) == 3, "ERROR: Incorrect format for simulated read name, $(spl)!" )
+   nodes  = split( spl[1], '_' )[end] |> x->split( x, '-' )
+   offset_m1 = split( spl[2], ':' )[end] |> x->split( x, '-' )
+   offset_m2 = split( spl[3], ':' )[end] |> x->split( x, '-' )
+   #@assert( length(offset) == 2, "ERROR: Incorrect format for simulated read name, $(read.name)!" )
+   if length(offset_m1) != 2 || length(offset_m2) != 2
+      return false,false,true
+   end
+   nlist = map( x->parse(Int, x), nodes )
+
+   off_m1 = parse(Int, offset_m1[1]), parse(Int, offset_m1[2])
+   mate1 = get_path( off_m1[1], off_m1[2] - off_m1[1], nlist, lib.graphs[gene] )
+   part_m1,comp_m1 = cmp_paths( mate1, best )
+
+   off_m2 = parse(Int, offset_m2[1]), parse(Int, offset_m2[2])
+   mate2 = get_path( off_m2[1], off_m2[2] - off_m2[1], nlist, lib.graphs[gene] )
+   part_m2,comp_m2 = cmp_paths( mate2, best )
+
+   (part_m1 || part_m2),(comp_m1 || comp_m2),failed
 end
 
 process_reads!( parser, param::AlignParam, lib::GraphLib,
@@ -137,11 +157,13 @@ function _process_reads!( parser, param::AlignParam, lib::GraphLib, quant::Graph
                sam && write_sam( stdbuf, reads[i], align.value[1], lib )
             end
             if simul
-               part,full = ismappedcorrectly( reads[i], align.value, lib )
+               part,full,fail = ismappedcorrectly( reads[i], align.value, lib )
                correct_part += part ? 1 : 0
                correct_full += full ? 1 : 0
+               !fail && (mapped += 1)
+            else
+               mapped += 1
             end
-            mapped += 1
             @fastmath mean_readlen += (length(reads[i].seq) - mean_readlen) / mapped
          end
       end

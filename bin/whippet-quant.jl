@@ -95,7 +95,7 @@ function main()
          @timer mapped,part,full,total,readlen = process_reads!( parser, param, lib, quant, multi, sam=args["sam"], simul=args["simul"] )
          readlen = round(Int, readlen)
          println(STDERR, "Finished mapping $mapped single-end reads of length $readlen out of a total $total reads...")
-         println(STDERR, "Mapped $part -- $( part / total ) correctly at offset, $full -- $( full / total ) correctly at full path!")
+         println(STDERR, "Mapped $part -- $( (part / mapped)*100 ) correctly at offset, $full -- $( (full / mapped)*100 ) correctly at full path!")
       end
    end
 
