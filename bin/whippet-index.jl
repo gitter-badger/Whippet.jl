@@ -1,7 +1,8 @@
 #!/usr/bin/env julia
 # Tim Sterne-Weiler 2015
 
-const ver = "v0.1-rc2"
+const ver = chomp(readline(open(splitdir(@__FILE__)[1] * "/VERSION")))
+const dir = abspath( splitdir(@__FILE__)[1] * "/../src" )
 
 tic()
 println( STDERR, "Whippet $ver loading and compiling... " )
@@ -14,8 +15,6 @@ using IntArrays
 using Libz
 
 using ArgParse
-
-const dir = abspath( splitdir(@__FILE__)[1] * "/../src" )
 
 include("$dir/types.jl")
 include("$dir/bio_nuc_safepatch.jl")
@@ -31,7 +30,7 @@ function parse_cmd()
   @add_arg_table s begin
     "--kmer", "-k"
       help = "Kmer size to use for exon-exon junctions (default 9)"
-      arg_type = Int
+      arg_type = Int64
       default  = 9
     "--fasta"
       help = "File containg the genome in fasta, one entry per chromosome [.gz]"
@@ -59,7 +58,7 @@ function main()
    flat = fixpath( args["flat"] )
    fh = open( flat , "r")
    if isgzipped( flat )
-      fh = fh |> ZlibInflateInputStream
+      fh = fh |> x->ZlibInflateInputStream(x, reset_on_end=true)
    end
    @timer ref = load_refflat(fh)
 

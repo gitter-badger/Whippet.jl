@@ -24,8 +24,26 @@ immutable AlignParam
    is_circ_ok::Bool     # Do we allow back edges
 end
 
-AlignParam( ispaired = false ) = ispaired ? AlignParam( 2, 9, 2, 4, 4, 18, 5, 18, 2500, 25, 45, false, true, true, false, true ) :
-                                            AlignParam( 2, 9, 2, 4, 4, 18, 5, 18, 1000, 10, 45, false, false, true, false, true )
+AlignParam( ispaired = false ) = ispaired ? AlignParam( 2, 9, 2, 4, 4, 18, 5, 18, 2500, 25, 45, 
+                                                        false, true, true, false, true ) :
+                                            AlignParam( 2, 9, 2, 4, 4, 18, 5, 18, 1000, 10, 45, 
+                                                        false, false, true, false, true )
+
+# load from command line args
+@inline function AlignParam( args::Dict{AbstractString,Any}, ispaired=false; kmer=9 )
+   const aln = AlignParam( args["mismatches"], kmer,
+                           args["seed-try"],
+                           args["seed-tol"], 4,
+                           args["seed-len"],
+                           args["seed-buf"],
+                           args["seed-inc"],
+                           args["pair-range"], 10,
+                           args["score-min"],
+                           args["stranded"], ispaired,
+                           args["rev-pair"], false,
+                           args["no-circ"] )
+   aln
+end
 
 abstract UngappedAlignment
 
@@ -337,10 +355,11 @@ function spliced_fwd_extend{T,K}( p::AlignParam, lib::GraphLib, geneind::Coordin
 
    best = align
    const left_kmer_ind = kmer_index(lib.graphs[geneind].edgeleft[edgeind])
+   isdefined( lib.edges.left, left_kmer_ind ) || return align
    const right_nodes = lib.edges.left[ left_kmer_ind ] ∩ lib.edges.right[ kmer_index(rkmer) ]
 
-   # do a test for trans splicing, and reset right_nodes
    for rn in right_nodes
+      rn.gene == align.path[1].gene || continue
       const rn_offset = lib.graphs[rn.gene].nodeoffset[rn.node]
       res_align::SGAlignment = ungapped_fwd_extend( p, lib, rn.gene, Int(rn_offset), read, ridx, 
                                                     align=deepcopy(align), nodeidx=rn.node )
@@ -503,6 +522,7 @@ function spliced_rev_extend{T,K}( p::AlignParam, lib::GraphLib, geneind::Coordin
 
    best = align
    const right_kmer_ind = kmer_index(lib.graphs[geneind].edgeright[edgeind])
+   isdefined( lib.edges.right, right_kmer_ind ) || return align
    const left_nodes = lib.edges.right[ right_kmer_ind ] ∩ lib.edges.left[ kmer_index(lkmer) ]
 
    #println("$left_nodes, $lkmer")
@@ -510,6 +530,7 @@ function spliced_rev_extend{T,K}( p::AlignParam, lib::GraphLib, geneind::Coordin
 
    # do a test for trans-splicing, and reset left_nodes
    for rn in left_nodes
+      rn.gene == align.path[1].gene || continue
       const rn_offset = lib.graphs[rn.gene].nodeoffset[rn.node-1] + lib.graphs[rn.gene].nodelen[rn.node-1] - 1
       #println("$(lib.graphs[rn.gene].seq[rn_offset-50:rn_offset])") 
       res_align::SGAlignment = ungapped_rev_extend( p, lib, rn.gene, Int(rn_offset), read, ridx, 

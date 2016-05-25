@@ -309,6 +309,73 @@ function Base.sum( vec::Vector{AmbigCounts} )
    sum
 end
 
+function extend_edges!{K,V}( edges::IntervalMap{K,V}, pgraph::PsiGraph, igraph::PsiGraph,
+                             ambig_edge::Nullable{Vector{IntervalValue}}, node::NodeInt )
+
+   minv = min( pgraph.min, igraph.min )
+   maxv = max( pgraph.max, igraph.max  )
+   idx = node - 1
+   shouldpush = false
+   while idx > minv # <----- node iter left
+      #iterate through local edges to the left
+      for edg in intersect( edges, (idx,idx) )
+         # if this is a new edge and connects to our idx from the left
+         if isconnecting( edg, idx ) && edg.last == idx && edg.first >= minv
+            shouldpush = false
+            if edg.last in pgraph
+               push!( pgraph, edg, value_bool=false )
+               shouldpush = true
+            end
+            if edg.last in igraph
+               push!( igraph, edg, value_bool=false )
+               shouldpush = true
+            end
+            if shouldpush
+               if edg.first < minv
+                  minv = edg.first
+               end
+               if isnull( ambig_edge )
+                  ambig_edge = Nullable( Vector{IntervalValue}() )
+               end
+               push!( ambig_edge.value, edg )
+            end
+         end
+      end
+      idx -= 1
+   end
+
+   idx = node + 1
+   while idx < maxv # iter right node ------->
+      # iterate through local edges to the right
+      for edg in intersect( edges, (idx,idx) )
+         # if this is a new edge and connects to our idx from the left
+         if isconnecting( edg, idx ) && edg.first == idx && edg.last <= maxv
+            shouldpush = false
+            if edg.first in pgraph
+               push!( pgraph, edg, value_bool=false )
+               shouldpush = true
+            end
+            if edg.first in igraph
+               push!( igraph, edg, value_bool=false )
+               shouldpush = true
+            end
+            if shouldpush
+               if edg.last > maxv
+                  maxv = edg.last
+               end
+               if isnull( ambig_edge )
+                  ambig_edge = Nullable( Vector{IntervalValue}() )
+               end
+               push!( ambig_edge.value, edg )
+            end
+         end
+      end
+      idx += 1
+   end
+
+   ambig_edge
+end
+
 # add_node_counts! for single pgraph (used in tandem_utrs)
 function add_node_counts!( ambig::Vector{AmbigCounts}, pgraph::PsiGraph,
                            sgquant::SpliceGraphQuant, bias::Float64 )
@@ -547,6 +614,7 @@ function _process_tandem_utr( sg::SpliceGraph, sgquant::SpliceGraphQuant,
    end
 
    psi = Nullable{Float64}()
+   len = length(used_node)
    if total_cnt > 2
       ambig_cnt = Nullable( Vector{AmbigCounts}() )
       utr_graph = build_utr_graph( used_node, motif, sgquant )
@@ -556,7 +624,7 @@ function _process_tandem_utr( sg::SpliceGraph, sgquant::SpliceGraphQuant,
       psi = Nullable( get(utr_graph).psi )
    end
 
-   psi,utr_graph,ambig_cnt
+   psi,utr_graph,ambig_cnt,len
 end
 
 function _process_spliced( sg::SpliceGraph, sgquant::SpliceGraphQuant, 
@@ -639,85 +707,18 @@ function _process_spliced( sg::SpliceGraph, sgquant::SpliceGraphQuant,
          get(exc_graph).psi = zeros( length( get(exc_graph).count ) )
          get(inc_graph).psi = zeros( length( get(inc_graph).count ) )
          calculate_psi!( inc_graph.value, exc_graph.value, [get(inc_graph).count; get(exc_graph).count] )
-         #println( "$inc_path\n$exc_graph\n$ambig_cnt\n\n" )
          it = rec_spliced_em!( inc_graph.value, exc_graph.value, ambig_cnt.value, sig=4 )
-         #println( "$inc_path\n$exc_graph\n$ambig_cnt\n\n" )
          psi = Nullable( sum( get(inc_graph).psi ) )
       end
    end
-   psi,inc_graph,exc_graph,ambig_cnt
-end
-
-function extend_edges!{K,V}( edges::IntervalMap{K,V}, pgraph::PsiGraph, igraph::PsiGraph,
-                             ambig_edge::Nullable{Vector{IntervalValue}}, node::NodeInt )
-
-   minv = min( pgraph.min, igraph.min )
-   maxv = max( pgraph.max, igraph.max  )
-   idx = node - 1
-   shouldpush = false
-   while idx > minv # <----- node iter left
-      #iterate through local edges to the left
-      for edg in intersect( edges, (idx,idx) )
-         # if this is a new edge and connects to our idx from the left
-         if isconnecting( edg, idx ) && edg.last == idx && edg.first >= minv
-            shouldpush = false
-            if edg.last in pgraph
-               push!( pgraph, edg, value_bool=false )
-               shouldpush = true
-            end
-            if edg.last in igraph
-               push!( igraph, edg, value_bool=false )
-               shouldpush = true
-            end
-            if shouldpush
-               if edg.first < minv
-                  minv = edg.first
-               end
-               if isnull( ambig_edge )
-                  ambig_edge = Nullable( Vector{IntervalValue}() )
-               end
-               push!( ambig_edge.value, edg )
-            end
-         end
-      end
-      idx -= 1
-   end
-
-   idx = node + 1
-   while idx < maxv # iter right node ------->
-      # iterate through local edges to the right
-      for edg in intersect( edges, (idx,idx) )
-         # if this is a new edge and connects to our idx from the left
-         if isconnecting( edg, idx ) && edg.first == idx && edg.last <= maxv
-            shouldpush = false
-            if edg.first in pgraph
-               push!( pgraph, edg, value_bool=false )
-               shouldpush = true
-            end
-            if edg.first in igraph
-               push!( igraph, edg, value_bool=false )
-               shouldpush = true
-            end
-            if shouldpush
-               if edg.last > maxv
-                  maxv = edg.last
-               end
-               if isnull( ambig_edge )
-                  ambig_edge = Nullable( Vector{IntervalValue}() )
-               end
-               push!( ambig_edge.value, edg )
-            end
-         end
-      end
-      idx += 1
-   end
-
-   ambig_edge
+   total_reads = connecting_val + spanning_val
+   psi,inc_graph,exc_graph,ambig_cnt,total_reads
 end
 
 function process_events( outfile, lib::GraphLib, graphq::GraphLibQuant; isnodeok=true )
    io = open( outfile, "w" )
-   stream = ZlibDeflateOutputStream(io)
+   stream = ZlibDeflateOutputStream( io )
+   output_psi_header( stream )
    for g in 1:length(lib.graphs)
       name = lib.names[g]
       chr  = lib.info[g].name
@@ -742,22 +743,23 @@ function _process_events( io::BufOut, sg::SpliceGraph, sgquant::SpliceGraphQuant
       motif = convert(EdgeMotif, sg.edgetype[i], sg.edgetype[i+1] )
       motif == NONE_MOTIF && (i += 1; continue)
       if isobligate( motif ) # is utr event
-         psi,utr,ambig = _process_tandem_utr( sg, sgquant, convert(NodeInt, i), motif ) 
-         if !isnull( psi )
-            if any( map( isnan, psi.value ) )
-               println(STDERR, get(utr))
-            end
-            ambig_cnt = isnull( ambig ) ? 0.0 : sum( ambig.value )
-            i = output_utr( io, round(get(psi),4), utr, ambig_cnt, motif, sg, i , info )
-            #i += (motif == TXST_MOTIF) ? length(psi.value)-2 : length(psi.value)-2 
+         psi,utr,ambig,len = _process_tandem_utr( sg, sgquant, convert(NodeInt, i), motif ) 
+         if !isnull( psi ) && !any( map( isnan, psi.value ) )
+            total_cnt = sum(utr) + sum(ambig)
+            i = output_utr( io, round(get(psi),4), utr, total_cnt, motif, sg, i , info )   
+         else
+            # psi/utr/total_cnt ignored here.
+            i = output_utr( io, zeros(len), utr, 0.0, motif, sg, i, info, empty=true )
          end
       else  # is a spliced node
          bias = calculate_bias!( sgquant )
-         psi,inc,exc,ambig = _process_spliced( sg, sgquant, convert(NodeInt, i), motif, bias, isnodeok )
-         if !isnull( psi )
-            total_cnt = sum(inc) + sum(exc) + sum(ambig)
-            conf_int  = binomial_likelihood_ci( get(psi), total_cnt, sig=3 )
-            output_psi( io, signif(get(psi),4), inc, exc, total_cnt, conf_int, motif, sg, i, info, bias  ) # TODO bias
+         psi,inc,exc,ambig,total_cnt = _process_spliced( sg, sgquant, convert(NodeInt, i), motif, bias, isnodeok )
+         #total_cnt = sum(inc) + sum(exc) + sum(ambig)
+         if !isnull( psi ) && 0 <= psi.value <= 1 && total_cnt > 0
+            conf_int  = beta_posterior_ci( psi.value, total_cnt, sig=3 )
+            output_psi( io, signif(psi.value,4), inc, exc, total_cnt, conf_int, motif, sg, i, info, bias  ) # TODO bias
+         else
+            output_empty( io, motif, sg, i, info )
          end
       end
       i += 1
@@ -784,6 +786,9 @@ function divsignif!{ N <: Number, D <: Number, I <: Integer }( arr::Vector{N}, d
    end
 end
 
+# Deprecated -- for beta_posterior_ci which is more accurate and on the correct
+# 0,1 domain, rather than the normal approximation given by the sqrt of 
+# fisher information below
 @inline function binomial_likelihood_ci( p, n, z=1.64; sig=0 )
    const fisher_info = (p * (1-p)) / n
    if fisher_info < 0
@@ -796,6 +801,21 @@ end
    else
       const lo = max( 0.0, p - ci )
       const hi = min( 1.0, p + ci )
+   end
+   lo,hi
+end
+
+# Beta(
+@inline function beta_posterior_ci( p, n; ci=0.9, sig=0 )
+   const lo_q = (1 - ci)/2
+   const hi_q = 1 - lo_q
+   const beta = Beta( p*n + 1, (1-p)*n + 1 )
+   if sig > 0
+      const lo = signif( quantile(beta, lo_q), sig )
+      const hi = signif( quantile(beta, hi_q), sig )
+   else 
+      const lo = quantile(beta, lo_q)
+      const hi = quantile(beta, hi_q)
    end
    lo,hi
 end
@@ -898,8 +918,8 @@ function rec_tandem_em!( pgraph::PsiGraph, ambig::Vector{AmbigCounts};
 
    if utr_temp != pgraph.psi && it < max
       it = rec_tandem_em!( pgraph, ambig,
-                            utr_temp=utr_temp, count_temp=count_temp,
-                            it=it+1, max=max, sig=sig )
+                           utr_temp=utr_temp, count_temp=count_temp,
+                           it=it+1, max=max, sig=sig )
    end
    it
 end
