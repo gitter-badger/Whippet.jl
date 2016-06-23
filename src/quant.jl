@@ -163,7 +163,7 @@ end
 # inside of a node for which a read could map without overlapping a junction
 # is put into units of junction derived effective_length
 # kadj is minimum of (readlength - minalignlen) and k-1
-@inline function eff_length( node, sg::SpliceGraph, eff_len::Int, kadj::Int )
+#=@inline function eff_length( node, sg::SpliceGraph, eff_len::Int, kadj::Int )
 #   len = sg.nodelen[node] + (istxstart( sg.edgetype[node] ) ? 0 : kadj) +
 #                            (istxstop( sg.edgetype[node+1] ) ? 0 : kadj)
    first = sg.nodeoffset[node]
@@ -172,6 +172,12 @@ end
                               (istxstop( sg.edgetype[node+1] ) ? 0 : kadj)
    @fastmath map = sum(sg.map[first:last]) / length(first:last)
    @fastmath (len * map) / eff_len
+end
+=#
+@inline function eff_length( node, sg::SpliceGraph, eff_len::Int, kadj::Int )
+   len = sg.nodelen[node] + (istxstart( sg.edgetype[node] ) ? 0 : kadj) +
+                            (istxstop( sg.edgetype[node+1] ) ? 0 : kadj)
+   @fastmath len / eff_len
 end
 
 function eff_lengths!( sg::SpliceGraph, sgquant::SpliceGraphQuant, eff_len::Int, kadj::Int )

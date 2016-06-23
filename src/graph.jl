@@ -86,7 +86,6 @@ immutable SpliceGraph
    edgeleft::Vector{SGKmer}     # left edges
    edgeright::Vector{SGKmer}    # right edges
    seq::SGSequence              # SG sequence
-   map::BitVector               # Mappable positions
 end
 # All positive strand oriented sequences---> 
 # Node array: txStart| 1 |   2   | 3 |    4    |5| 6 |txEnd
@@ -241,7 +240,7 @@ function calculate_mappability!( sg::SpliceGraph, index::FMIndex; seed_len=18, s
       for pos in first:last
          const seq = sg.seq[pos:(pos+seed_len-1)]
          if length(FMIndexes.sa_range( seq, index )) <= seed_tolerance
-            sg.map[pos] = true
+            #sg.map[pos] = true
          end
       end
    end
