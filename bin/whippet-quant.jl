@@ -83,6 +83,7 @@ function parse_cmd()
       action   = :store_true
     "--simul"
       help     = "Data is simulated, output mapping error rates"
+      action   = :store_true
     "--force-gz"
       help     = "Regardless of suffix, consider read input as gzipped"
       action   = :store_true
@@ -131,6 +132,9 @@ function main()
          readlen = round(Int, readlen)
          println(STDERR, "Finished mapping $mapped single-end reads of length $readlen out of a total $total reads...")
          println(STDERR, "Mapped $part -- $( (part / mapped)*100 ) correctly at offset, $full -- $( (full / mapped)*100 ) correctly at full path!")
+
+         print(STDOUT, basename( args["out"] ))
+         println(STDOUT, "\t$total\t$mapped\t$part\t$full" )         
       end
    end
 
