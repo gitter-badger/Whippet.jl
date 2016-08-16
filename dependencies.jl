@@ -13,9 +13,9 @@ function check_and_install( pkg; clone=false, checkout=false )
       else
          Pkg.add(pkg)
       end
-      if checkout
-         Pkg.checkout(pkg)
-      end
+   end
+   if checkout
+      Pkg.checkout(pkg)
    end
 end
 
