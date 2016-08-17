@@ -171,7 +171,7 @@ ex1_single\tchr0\t+\t10\t20\t10\t20\t1\t10,\t20,\t0\tsingle\tnone\tnone\t-1,
    #println(edges.right)
 
    lib = GraphLib( xoffset, xgenes, xinfo, xgraph, edges, fm, true, kmer_size )
-
+   
    @testset "Kmer Edges" begin
       left  = [sg"CA", sg"AG", sg"AG", sg"TC", sg"AA"]
       right = [sg"GC", sg"CC", sg"CT", sg"TT", sg"TG"]
@@ -199,6 +199,20 @@ ex1_single\tchr0\t+\t10\t20\t10\t20\t1\t10,\t20,\t0\tsingle\tnone\tnone\t-1,
       exon2_rind = rkmer[1]
       @test intersect( edges.left[exon1_lind], edges.right[exon2_rind] ) == edges.right[exon2_rind]
       @test edges.left[exon1_lind] ∩ edges.right[exon2_rind] == edges.right[exon2_rind]
+
+      genea_nodea = SGNode(0x01, 0x01)
+      genea_nodeb = SGNode(0x01, 0x02)
+      geneb_nodea = SGNode(0x02, 0x01)
+      @test genea_nodea < genea_nodeb
+      @test genea_nodea < geneb_nodea
+      @test genea_nodeb > genea_nodea
+      @test geneb_nodea > genea_nodea
+      sarr = sort([ geneb_nodea, genea_nodea, genea_nodeb ])
+      @test sarr[1] == genea_nodea
+      @test sarr[2] == genea_nodeb
+      @test sarr[3] == geneb_nodea
+
+      
    end
 
    @testset "Alignment" begin
