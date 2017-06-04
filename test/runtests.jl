@@ -352,7 +352,7 @@ IIIIIIIIIIII
             cnt += length(reads)
          end
          @test cnt == 128482 # correct number of reads in file
-         #run(`julia ../bin/whippet-quant.jl --ebi SRR1199010`)
+         @test typeof(run(`julia ../bin/whippet-quant.jl --ebi SRR1199010 -x test_index`)) <: Void
       end
    end
 end

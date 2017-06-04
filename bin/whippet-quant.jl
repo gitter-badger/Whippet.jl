@@ -142,7 +142,7 @@ function main()
       println(STDERR, "Whippet does not currrently support nprocs() > 1")
       return #TODO: first implementation was too slow, ie too much communication overhead
    else
-      println(STDERR, "Processing reads...")
+      println(STDERR, "Processing reads from $(args["filename.fastq[.gz]"])...")
       if ispaired
          @timer mapped,total,readlen = process_paired_reads!( parser, mate_parser, param, lib, quant, multi, 
                                                               sam=args["sam"], qualoffset=enc_offset, 
